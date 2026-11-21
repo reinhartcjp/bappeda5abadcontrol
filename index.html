@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="initial-scale=1,user-scalable=no,maximum-scale=1,width=device-width">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="css/leaflet.css">
+        <link rel="stylesheet" href="css/qgis2web.css">
+        <link rel="stylesheet" href="css/fontawesome-all.min.css">
+        <style>
+        html, body, #map {
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            margin: 0;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        /* Point Outer Glow (50% Orange-Red) & Drop Shadow */
+        .leaflet-pane.leaflet-pane_211126_event_3-pane svg path,
+        .event-point-glow {
+            filter: drop-shadow(0 0 6px rgba(255, 82, 30, 0.5)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.65));
+        }
+
+        /* Bottom-Center Timeline Control Container */
+        .timeline-wrapper {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            pointer-events: auto;
+        }
+        .timeline-control {
+            background: rgba(18, 20, 26, 0.90);
+            backdrop-filter: blur(10px);
+            color: #ffffff;
+            padding: 14px 22px;
+            border-radius: 12px;
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            width: 390px;
+            max-width: calc(100vw - 32px);
+            font-family: 'Montserrat', sans-serif;
+        }
+        .timeline-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        .timeline-title {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.9px;
+            color: #a0aec0;
+            font-weight: 600;
+        }
+        .timeline-current {
+            font-size: 15px;
+            font-weight: 700;
+            color: #ffd166;
+        }
+        .timeline-slider {
+            width: 100%;
+            cursor: pointer;
+            accent-color: #f03b20;
+            margin: 6px 0 10px 0;
+        }
+        .timeline-controls-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+        }
+        .playback-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .ctrl-btn {
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            color: #ffffff;
+            height: 30px;
+            padding: 0 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 11px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            transition: all 0.18s ease;
+        }
+        .ctrl-btn:hover {
+            background: rgba(255, 255, 255, 0.24);
+        }
+        .ctrl-btn.active {
+            background: #f03b20;
+            border-color: #f03b20;
+            color: #ffffff;
+        }
+        .event-badge {
+            font-size: 11px;
+            font-weight: 600;
+            color: #e2e8f0;
+            white-space: nowrap;
+        }
+
+        /* Event Name Labels: Montserrat, White text, Black background */
+        .event-label {
+            font-family: 'Montserrat', sans-serif !important;
+            font-size: 10.5px;
+            font-weight: 600;
+            color: #ffffff !important;
+            background-color: rgba(0, 0, 0, 0.88) !important;
+            border: 1px solid rgba(255, 255, 255, 0.25) !important;
+            border-radius: 4px;
+            padding: 3px 7px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+            white-space: nowrap;
+        }
+        .event-label::before {
+            border-top-color: rgba(0, 0, 0, 0.88) !important;
+        }
+        </style>
+        <title>Peta Sebaran Event DKI Jakarta</title>
+    </head>
+    <body>
+        <div id="map"></div>
+
+        <!-- Centered Bottom Control Menu -->
+        <div class="timeline-wrapper" id="timelineWrapper">
+            <div class="timeline-control">
+                <div class="timeline-header">
+                    <span class="timeline-title">Periode Event (Nov 2026 &ndash; Des 2027)</span>
+                    <span class="timeline-current" id="monthLabel">Semua Bulan</span>
+                </div>
+                <input type="range" min="0" max="13" value="0" class="timeline-slider" id="monthSlider">
+                <div class="timeline-controls-row">
+                    <div class="playback-group">
+                        <button type="button" class="ctrl-btn" id="revBtn" title="Mundur 1 Bulan"><i class="fas fa-step-backward"></i></button>
+                        <button type="button" class="ctrl-btn" id="playPauseBtn" title="Putar / Jeda"><i class="fas fa-play" id="playPauseIcon"></i> <span id="playPauseText">Play</span></button>
+                        <button type="button" class="ctrl-btn" id="fwdBtn" title="Maju 1 Bulan"><i class="fas fa-step-forward"></i></button>
+                    </div>
+                    <span class="event-badge" id="eventCount">185 Event</span>
+                    <button type="button" class="ctrl-btn active" id="showAllBtn">Semua</button>
+                </div>
+            </div>
+        </div>
+
+        <script src="js/qgis2web_expressions.js"></script>
+        <script src="js/leaflet.js"></script>
+        <script src="js/leaflet.rotatedMarker.js"></script>
+        <script src="js/leaflet.pattern.js"></script>
+        <script src="js/leaflet-hash.js"></script>
+        <script src="js/Autolinker.min.js"></script>
+        <script src="js/rbush.min.js"></script>
+        <script src="js/labelgun.min.js"></script>
+        <script src="js/labels.js"></script>
+        <script src="data/CL_AR_KABKOT_DKIar_kabkot_dkicopy_1.js"></script>
+        <script src="data/LN_OUTER_KABKOT_JKTlines_2.js"></script>
+        <script src="data/211126_event_3.js"></script>
+        <script>
+        var map = L.map('map', {
+            zoomControl: true, maxZoom: 28, minZoom: 1
+        }).fitBounds([[-6.355, 106.500], [-6.035, 107.055]]);
+
+        var hash = new L.Hash(map);
+        map.attributionControl.setPrefix('<a href="https://github.com/tomchadwin/qgis2web" target="_blank">qgis2web</a> &middot; <a href="https://leafletjs.com" title="A JS library for interactive maps">Leaflet</a> &middot; <a href="https://qgis.org">QGIS</a>');
+        var autolinker = new Autolinker({truncate: {length: 30, location: 'smart'}});
+        var bounds_group = new L.featureGroup([]);
+        function setBounds() {}
+
+        function fmt(val) {
+            return (val !== null && val !== undefined) ? autolinker.link(String(val)) : '';
+        }
+
+        // Prevent map drag/zoom when interacting with centered control menu
+        var timelineWrapper = document.getElementById('timelineWrapper');
+        L.DomEvent.disableClickPropagation(timelineWrapper);
+        L.DomEvent.disableScrollPropagation(timelineWrapper);
+
+        // 0. Basemap: Google Satellite
+        map.createPane('pane_GoogleSatellite_0');
+        map.getPane('pane_GoogleSatellite_0').style.zIndex = 400;
+        var layer_GoogleSatellite_0 = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+            pane: 'pane_GoogleSatellite_0',
+            opacity: 1.0,
+            attribution: '',
+            minZoom: 1,
+            maxZoom: 28,
+            minNativeZoom: 0,
+            maxNativeZoom: 18
+        });
+        map.addLayer(layer_GoogleSatellite_0);
+
+        // 1. Inverted Polygon Mask (40% White Outside DKI Jakarta)
+        function createInvertedGeoJSON(sourceGeoJSON) {
+            var outerWorldRing = [
+                [-180, -90],
+                [180, -90],
+                [180, 90],
+                [-180, 90],
+                [-180, -90]
+            ];
+            var holes = [];
+            if (sourceGeoJSON && sourceGeoJSON.features) {
+                sourceGeoJSON.features.forEach(function(feat) {
+                    if (!feat.geometry) return;
+                    if (feat.geometry.type === 'Polygon') {
+                        holes.push(feat.geometry.coordinates[0]);
+                    } else if (feat.geometry.type === 'MultiPolygon') {
+                        feat.geometry.coordinates.forEach(function(poly) {
+                            holes.push(poly[0]);
+                        });
+                    }
+                });
+            }
+            return {
+                type: 'FeatureCollection',
+                features: [{
+                    type: 'Feature',
+                    properties: {},
+                    geometry: {
+                        type: 'Polygon',
+                        coordinates: [outerWorldRing].concat(holes)
+                    }
+                }]
+            };
+        }
+
+        function style_CL_AR_KABKOT_DKIar_kabkot_dkicopy_1_0() {
+            return {
+                pane: 'pane_CL_AR_KABKOT_DKIar_kabkot_dkicopy_1',
+                stroke: false,
+                fill: true,
+                fillOpacity: 0.4,
+                fillColor: 'rgba(255,255,255,1.0)',
+                fillRule: 'evenodd',
+                interactive: false
+            };
+        }
+        map.createPane('pane_CL_AR_KABKOT_DKIar_kabkot_dkicopy_1');
+        map.getPane('pane_CL_AR_KABKOT_DKIar_kabkot_dkicopy_1').style.zIndex = 401;
+        map.getPane('pane_CL_AR_KABKOT_DKIar_kabkot_dkicopy_1').style['mix-blend-mode'] = 'normal';
+        var invertedDKI = createInvertedGeoJSON(json_CL_AR_KABKOT_DKIar_kabkot_dkicopy_1);
+        var layer_CL_AR_KABKOT_DKIar_kabkot_dkicopy_1 = new L.geoJson(invertedDKI, {
+            attribution: '',
+            interactive: false,
+            pane: 'pane_CL_AR_KABKOT_DKIar_kabkot_dkicopy_1',
+            style: style_CL_AR_KABKOT_DKIar_kabkot_dkicopy_1_0
+        });
+        map.addLayer(layer_CL_AR_KABKOT_DKIar_kabkot_dkicopy_1);
+
+        // 2. Line Layer: White Dashed Line
+        function style_LN_OUTER_KABKOT_JKTlines_2_0() {
+            return {
+                pane: 'pane_LN_OUTER_KABKOT_JKTlines_2',
+                opacity: 1,
+                color: 'rgba(255,255,255,1.0)',
+                dashArray: '8, 6',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 2.0,
+                fillOpacity: 0,
+                interactive: false
+            };
+        }
+        map.createPane('pane_LN_OUTER_KABKOT_JKTlines_2');
+        map.getPane('pane_LN_OUTER_KABKOT_JKTlines_2').style.zIndex = 402;
+        map.getPane('pane_LN_OUTER_KABKOT_JKTlines_2').style['mix-blend-mode'] = 'normal';
+        var layer_LN_OUTER_KABKOT_JKTlines_2 = new L.geoJson(json_LN_OUTER_KABKOT_JKTlines_2, {
+            attribution: '',
+            interactive: false,
+            dataVar: 'json_LN_OUTER_KABKOT_JKTlines_2',
+            layerName: 'layer_LN_OUTER_KABKOT_JKTlines_2',
+            pane: 'pane_LN_OUTER_KABKOT_JKTlines_2',
+            style: style_LN_OUTER_KABKOT_JKTlines_2_0
+        });
+        bounds_group.addLayer(layer_LN_OUTER_KABKOT_JKTlines_2);
+        map.addLayer(layer_LN_OUTER_KABKOT_JKTlines_2);
+
+        // 3. Chronological 5-Level Gradation (Nov 2026: #ffffb2 -> Des 2027: #bd0026)
+        var gradationPalette = [
+            '#ffffb2', // Level 1 (Nov 2026 - Jan 2027)
+            '#fecc5c', // Level 2 (Feb 2027 - Apr 2027)
+            '#fd8d3c', // Level 3 (Mei 2027 - Jul 2027)
+            '#f03b20', // Level 4 (Agu 2027 - Okt 2027)
+            '#bd0026'  // Level 5 (Nov 2027 - Des 2027)
+        ];
+
+        var timelineMonths = [
+            { key: '2026-11', label: 'Nov 2026' },
+            { key: '2026-12', label: 'Des 2026' },
+            { key: '2027-01', label: 'Jan 2027' },
+            { key: '2027-02', label: 'Feb 2027' },
+            { key: '2027-03', label: 'Mar 2027' },
+            { key: '2027-04', label: 'Apr 2027' },
+            { key: '2027-05', label: 'Mei 2027' },
+            { key: '2027-06', label: 'Jun 2027' },
+            { key: '2027-07', label: 'Jul 2027' },
+            { key: '2027-08', label: 'Agu 2027' },
+            { key: '2027-09', label: 'Sep 2027' },
+            { key: '2027-10', label: 'Okt 2027' },
+            { key: '2027-11', label: 'Nov 2027' },
+            { key: '2027-12', label: 'Des 2027' }
+        ];
+
+        var monthIndexMap = {};
+        timelineMonths.forEach(function(m, idx) {
+            monthIndexMap[m.key] = idx;
+        });
+
+        function extractYearMonth(props) {
+            var raw = props['Tanggal_QGIS'] || props['Tanggal'] || '';
+            var str = String(raw).trim();
+            var isoMatch = str.match(/(20\d{2})[-\/](\d{1,2})/);
+            if (isoMatch) {
+                return isoMatch[1] + '-' + isoMatch[2].padStart(2, '0');
+            }
+            var dmyMatch = str.match(/(\d{1,2})[-\/](\d{1,2})[-\/](20\d{2})/);
+            if (dmyMatch) {
+                return dmyMatch[3] + '-' + dmyMatch[2].padStart(2, '0');
+            }
+            return '';
+        }
+
+        function getFeatureChronologicalColor(feature) {
+            var ym = extractYearMonth((feature && feature.properties) || {});
+            var idx = monthIndexMap.hasOwnProperty(ym) ? monthIndexMap[ym] : 0;
+            var level = Math.min(4, Math.floor((idx / timelineMonths.length) * 5));
+            return gradationPalette[level];
+        }
+
+        // 4. Event Points Layer & Deduplicated Labels
+        var activeWindowShownLabels = new Set();
+
+        function onEachEventFeature(feature, layer) {
+            var p = feature.properties || {};
+            var ket = p['Keterangan Event \n(Tuliskan rangkaian acara yang jelas, singkat, dan informatif untuk dipublikasikan di website)']
+                   || p['Keterangan Event \n(Tuliskan rangkaian acara yang jelas, singkat, dan informatif untuk dipublikasikan di website).1'];
+            var poster = p['Link Google Drive \nPoster Acara'];
+            var eventName = p['Nama Acara'] ? String(p['Nama Acara']).trim() : '';
+
+            // Display permanent label only once per unique event name within the active time window
+            if (eventName) {
+                var normalizedKey = eventName.toLowerCase();
+                if (!activeWindowShownLabels.has(normalizedKey)) {
+                    activeWindowShownLabels.add(normalizedKey);
+                    layer.bindTooltip(eventName, {
+                        permanent: true,
+                        direction: 'top',
+                        offset: [0, -6],
+                        className: 'event-label'
+                    });
+                }
+            }
+
+            var popupContent = '<table>\
+                    <tr><th scope="row">Nama Acara</th><td>' + fmt(p['Nama Acara']) + '</td></tr>\
+                    <tr><th scope="row">Tanggal</th><td>' + fmt(p['Tanggal']) + '</td></tr>\
+                    <tr><th scope="row">Lokasi</th><td>' + fmt(p['Lokasi']) + '</td></tr>\
+                    <tr><th scope="row">Tier</th><td>' + fmt(p['Tier']) + '</td></tr>\
+                    <tr><th scope="row">Kategori</th><td>' + fmt(p['Kategori']) + '</td></tr>\
+                    <tr><th scope="row">PD/UKPD</th><td>' + fmt(p['PD/UKPD Pengusul']) + '</td></tr>\
+                    <tr><th scope="row">Keterangan</th><td>' + fmt(ket) + '</td></tr>\
+                    <tr><th scope="row">Poster</th><td>' + fmt(poster) + '</td></tr>\
+                </table>';
+            layer.bindPopup(popupContent, {maxHeight: 400});
+        }
+
+        function style_211126_event_3_0(feature) {
+            var fillHex = getFeatureChronologicalColor(feature);
+            return {
+                pane: 'pane_211126_event_3',
+                radius: 5.5,
+                stroke: false,
+                weight: 0,
+                fill: true,
+                fillOpacity: 0.95,
+                fillColor: fillHex,
+                className: 'event-point-glow',
+                interactive: true
+            };
+        }
+        map.createPane('pane_211126_event_3');
+        map.getPane('pane_211126_event_3').style.zIndex = 403;
+        map.getPane('pane_211126_event_3').style['mix-blend-mode'] = 'normal';
+        map.getPane('pane_211126_event_3').style.filter = 'drop-shadow(0 0 6px rgba(255, 82, 30, 0.5)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.65))';
+
+        var layer_211126_event_3 = new L.geoJson(null, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_211126_event_3',
+            layerName: 'layer_211126_event_3',
+            pane: 'pane_211126_event_3',
+            onEachFeature: onEachEventFeature,
+            pointToLayer: function (feature, latlng) {
+                return L.circleMarker(latlng, style_211126_event_3_0(feature));
+            }
+        });
+        bounds_group.addLayer(layer_211126_event_3);
+        map.addLayer(layer_211126_event_3);
+
+        // 5. Playback & Filtering Logic
+        var sliderEl = document.getElementById('monthSlider');
+        var labelEl = document.getElementById('monthLabel');
+        var showAllBtn = document.getElementById('showAllBtn');
+        var playPauseBtn = document.getElementById('playPauseBtn');
+        var playPauseIcon = document.getElementById('playPauseIcon');
+        var playPauseText = document.getElementById('playPauseText');
+        var revBtn = document.getElementById('revBtn');
+        var fwdBtn = document.getElementById('fwdBtn');
+
+        var isAllMode = true;
+        var playTimer = null;
+
+        function filterEventsByMonth(selectedKey) {
+            activeWindowShownLabels.clear();
+            layer_211126_event_3.clearLayers();
+            var filteredFeatures = json_211126_event_3.features.filter(function (feat) {
+                if (!selectedKey) return true;
+                return extractYearMonth(feat.properties || {}) === selectedKey;
+            });
+            layer_211126_event_3.addData(filteredFeatures);
+            document.getElementById('eventCount').textContent = filteredFeatures.length + ' Event';
+        }
+
+        function setMonthIndex(idx) {
+            if (idx < 0) idx = timelineMonths.length - 1;
+            if (idx >= timelineMonths.length) idx = 0;
+            isAllMode = false;
+            sliderEl.value = idx;
+            var item = timelineMonths[idx];
+            labelEl.textContent = item.label;
+            showAllBtn.classList.remove('active');
+            filterEventsByMonth(item.key);
+        }
+
+        function stopPlayback() {
+            if (playTimer) {
+                clearInterval(playTimer);
+                playTimer = null;
+            }
+            playPauseIcon.className = 'fas fa-play';
+            playPauseText.textContent = 'Play';
+            playPauseBtn.classList.remove('active');
+        }
+
+        function startPlayback() {
+            if (isAllMode) {
+                setMonthIndex(0);
+            }
+            playPauseIcon.className = 'fas fa-pause';
+            playPauseText.textContent = 'Pause';
+            playPauseBtn.classList.add('active');
+            playTimer = setInterval(function () {
+                var nextIdx = parseInt(sliderEl.value, 10) + 1;
+                if (nextIdx >= timelineMonths.length) {
+                    nextIdx = 0;
+                }
+                setMonthIndex(nextIdx);
+            }, 1500);
+        }
+
+        // Initialize with all events shown
+        filterEventsByMonth(null);
+
+        sliderEl.addEventListener('input', function () {
+            stopPlayback();
+            setMonthIndex(parseInt(this.value, 10));
+        });
+
+        playPauseBtn.addEventListener('click', function () {
+            if (playTimer) {
+                stopPlayback();
+            } else {
+                startPlayback();
+            }
+        });
+
+        revBtn.addEventListener('click', function () {
+            stopPlayback();
+            var current = isAllMode ? timelineMonths.length - 1 : parseInt(sliderEl.value, 10) - 1;
+            setMonthIndex(current);
+        });
+
+        fwdBtn.addEventListener('click', function () {
+            stopPlayback();
+            var current = isAllMode ? 0 : parseInt(sliderEl.value, 10) + 1;
+            setMonthIndex(current);
+        });
+
+        showAllBtn.addEventListener('click', function () {
+            stopPlayback();
+            isAllMode = true;
+            labelEl.textContent = 'Semua Bulan';
+            showAllBtn.classList.add('active');
+            filterEventsByMonth(null);
+        });
+
+        setBounds();
+        </script>
+    </body>
+</html>
