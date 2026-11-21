@@ -22,6 +22,11 @@
             overflow: hidden;
         }
 
+        /* Hide Leaflet / qgis2web / QGIS Watermark */
+        .leaflet-control-attribution {
+            display: none !important;
+        }
+
         /* Point Outer Glow (50% Orange-Red) & Drop Shadow */
         .leaflet-pane.leaflet-pane_211126_event_3-pane svg path,
         .event-point-glow {
@@ -76,7 +81,7 @@
             border-radius: 16px;
             box-shadow: 0 10px 32px rgba(0, 0, 0, 0.5);
             border: 1px solid rgba(255, 255, 255, 0.2);
-            width: 580px;
+            width: 680px;
             max-width: calc(100vw - 48px);
             font-family: 'Montserrat', sans-serif;
         }
@@ -109,29 +114,30 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
         }
         .playback-group {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
         }
         .ctrl-btn {
             background: rgba(255, 255, 255, 0.14);
             border: 1px solid rgba(255, 255, 255, 0.26);
             color: #ffffff;
             height: 42px;
-            padding: 0 18px;
+            padding: 0 16px;
             border-radius: 8px;
             cursor: pointer;
             font-family: 'Montserrat', sans-serif;
-            font-size: 15px;
+            font-size: 14.5px;
             font-weight: 600;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             gap: 8px;
             transition: all 0.18s ease;
+            white-space: nowrap;
         }
         .ctrl-btn:hover {
             background: rgba(255, 255, 255, 0.26);
@@ -198,7 +204,12 @@
                             <button type="button" class="ctrl-btn" id="fwdBtn" title="Maju 1 Bulan"><i class="fas fa-step-forward"></i></button>
                         </div>
                         <span class="event-badge" id="eventCount">185 Event</span>
-                        <button type="button" class="ctrl-btn active" id="showAllBtn">Semua</button>
+                        <div class="playback-group">
+                            <button type="button" class="ctrl-btn active" id="showAllBtn">Semua</button>
+                            <button type="button" class="ctrl-btn" id="recVideoBtn" title="Export Video Nov 2026 - Des 2027">
+                                <i class="fas fa-circle" style="color:#ff4d4d;"></i> Export Video
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -218,14 +229,16 @@
         <script src="data/211126_event_3.js"></script>
         <script>
         var map = L.map('map', {
-            zoomControl: false, maxZoom: 28, minZoom: 1
+            zoomControl: false,
+            attributionControl: false,
+            maxZoom: 28,
+            minZoom: 1
         });
 
         // Add Zoom In / Zoom Out buttons on the right side
         L.control.zoom({ position: 'topright' }).addTo(map);
 
         var hash = new L.Hash(map);
-        map.attributionControl.setPrefix('<a href="https://github.com/tomchadwin/qgis2web" target="_blank">qgis2web</a> &middot; <a href="https://leafletjs.com" title="A JS library for interactive maps">Leaflet</a> &middot; <a href="https://qgis.org">QGIS</a>');
         var autolinker = new Autolinker({truncate: {length: 30, location: 'smart'}});
         var bounds_group = new L.featureGroup([]);
         function setBounds() {}
@@ -474,7 +487,7 @@
         bounds_group.addLayer(layer_211126_event_3);
         map.addLayer(layer_211126_event_3);
 
-        // 5. Playback & Filtering Logic
+        // 5. Playback, Filtering & Video Export Logic
         var sliderEl = document.getElementById('monthSlider');
         var labelEl = document.getElementById('monthLabel');
         var showAllBtn = document.getElementById('showAllBtn');
@@ -483,6 +496,7 @@
         var playPauseText = document.getElementById('playPauseText');
         var revBtn = document.getElementById('revBtn');
         var fwdBtn = document.getElementById('fwdBtn');
+        var recVideoBtn = document.getElementById('recVideoBtn');
 
         var isAllMode = true;
         var playTimer = null;
@@ -569,6 +583,61 @@
             labelEl.textContent = 'Semua Bulan';
             showAllBtn.classList.add('active');
             filterEventsByMonth(null);
+        });
+
+        recVideoBtn.addEventListener('click', async function () {
+            try {
+                stopPlayback();
+                const stream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { displaySurface: 'browser', frameRate: 30 },
+                    audio: false,
+                    preferCurrentTab: true
+                });
+
+                const chunks = [];
+                const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+                    ? 'video/webm;codecs=vp9'
+                    : 'video/webm';
+                const recorder = new MediaRecorder(stream, {
+                    mimeType: mimeType,
+                    videoBitsPerSecond: 8000000
+                });
+
+                recorder.ondataavailable = function (e) {
+                    if (e.data && e.data.size > 0) chunks.push(e.data);
+                };
+
+                recorder.onstop = function () {
+                    stream.getTracks().forEach(track => track.stop());
+                    const blob = new Blob(chunks, { type: 'video/webm' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'Sebaran_Event_DKI_Nov2026_Des2027.webm';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    recVideoBtn.classList.remove('active');
+                };
+
+                recVideoBtn.classList.add('active');
+                setMonthIndex(0);
+                recorder.start();
+
+                let currentStep = 0;
+                const recInterval = setInterval(function () {
+                    currentStep++;
+                    if (currentStep < timelineMonths.length) {
+                        setMonthIndex(currentStep);
+                    } else {
+                        clearInterval(recInterval);
+                        setTimeout(function () {
+                            recorder.stop();
+                        }, 1500);
+                    }
+                }, 1500);
+            } catch (err) {
+                console.error('Recording cancelled or failed:', err);
+            }
         });
 
         setBounds();
