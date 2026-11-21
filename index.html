@@ -13,29 +13,13 @@
         <link rel="stylesheet" href="css/qgis2web.css">
         <link rel="stylesheet" href="css/fontawesome-all.min.css">
         <style>
-        html, body {
+        html, body, #map {
             width: 100%;
             height: 100%;
             padding: 0;
             margin: 0;
-            background: #12141a;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             font-family: 'Montserrat', sans-serif;
             overflow: hidden;
-        }
-
-        /* Target Canvas: 28.58 cm x 30.4 cm (scales gracefully if viewport is smaller) */
-        #map {
-            width: 28.58cm;
-            height: 30.4cm;
-            max-width: 100vw;
-            max-height: 100vh;
-            position: relative;
-            padding: 0;
-            margin: 0;
-            font-family: 'Montserrat', sans-serif;
         }
 
         /* Point Outer Glow (50% Orange-Red) & Drop Shadow */
@@ -44,10 +28,10 @@
             filter: drop-shadow(0 0 7px rgba(255, 82, 30, 0.5)) drop-shadow(0 2px 5px rgba(0, 0, 0, 0.65));
         }
 
-        /* Bottom-Center Timeline Control Container scaled for 28.58 cm x 30.4 cm */
+        /* Bottom-Center Timeline Control Container */
         .timeline-wrapper {
             position: absolute;
-            bottom: 30px;
+            bottom: 28px;
             left: 50%;
             transform: translateX(-50%);
             z-index: 1000;
@@ -57,12 +41,12 @@
             background: rgba(18, 20, 26, 0.90);
             backdrop-filter: blur(10px);
             color: #ffffff;
-            padding: 18px 26px;
+            padding: 16px 24px;
             border-radius: 14px;
             box-shadow: 0 8px 28px rgba(0, 0, 0, 0.48);
             border: 1px solid rgba(255, 255, 255, 0.18);
-            width: 480px;
-            max-width: calc(100vw - 40px);
+            width: 460px;
+            max-width: calc(100vw - 36px);
             font-family: 'Montserrat', sans-serif;
         }
         .timeline-header {
@@ -72,14 +56,14 @@
             margin-bottom: 8px;
         }
         .timeline-title {
-            font-size: 12px;
+            font-size: 11.5px;
             text-transform: uppercase;
             letter-spacing: 0.9px;
             color: #a0aec0;
             font-weight: 600;
         }
         .timeline-current {
-            font-size: 18px;
+            font-size: 17px;
             font-weight: 700;
             color: #ffd166;
         }
@@ -88,7 +72,7 @@
             height: 6px;
             cursor: pointer;
             accent-color: #f03b20;
-            margin: 8px 0 14px 0;
+            margin: 8px 0 12px 0;
         }
         .timeline-controls-row {
             display: flex;
@@ -105,12 +89,12 @@
             background: rgba(255, 255, 255, 0.12);
             border: 1px solid rgba(255, 255, 255, 0.24);
             color: #ffffff;
-            height: 36px;
-            padding: 0 14px;
+            height: 34px;
+            padding: 0 13px;
             border-radius: 7px;
             cursor: pointer;
             font-family: 'Montserrat', sans-serif;
-            font-size: 13px;
+            font-size: 12.5px;
             font-weight: 600;
             display: inline-flex;
             align-items: center;
@@ -127,7 +111,7 @@
             color: #ffffff;
         }
         .event-badge {
-            font-size: 13px;
+            font-size: 12.5px;
             font-weight: 600;
             color: #e2e8f0;
             white-space: nowrap;
@@ -136,7 +120,7 @@
         /* Event Name Labels: Montserrat, White text, Black background */
         .event-label {
             font-family: 'Montserrat', sans-serif !important;
-            font-size: 12px;
+            font-size: 11.5px;
             font-weight: 600;
             color: #ffffff !important;
             background-color: rgba(0, 0, 0, 0.88) !important;
@@ -161,7 +145,7 @@
     </head>
     <body>
         <div id="map">
-            <!-- Centered Bottom Control Menu inside 28.58 cm x 30.4 cm Canvas -->
+            <!-- Centered Bottom Control Menu -->
             <div class="timeline-wrapper" id="timelineWrapper">
                 <div class="timeline-control">
                     <div class="timeline-header">
@@ -286,7 +270,7 @@
         });
         map.addLayer(layer_CL_AR_KABKOT_DKIar_kabkot_dkicopy_1);
 
-        // 2. Line Layer: White Dashed Line (used to center DKI polygon cleanly in canvas)
+        // 2. Line Layer: White Dashed Line
         function style_LN_OUTER_KABKOT_JKTlines_2_0() {
             return {
                 pane: 'pane_LN_OUTER_KABKOT_JKTlines_2',
@@ -314,14 +298,18 @@
         bounds_group.addLayer(layer_LN_OUTER_KABKOT_JKTlines_2);
         map.addLayer(layer_LN_OUTER_KABKOT_JKTlines_2);
 
-        // Center DKI Jakarta Polygon directly in the middle of the 28.58 cm x 30.4 cm canvas
-        map.invalidateSize();
-        var dkiBounds = layer_LN_OUTER_KABKOT_JKTlines_2.getBounds();
-        if (dkiBounds && dkiBounds.isValid()) {
-            map.fitBounds(dkiBounds, { padding: [55, 55] });
-        } else {
-            map.fitBounds([[-6.365, 106.680], [-6.075, 106.975]], { padding: [55, 55] });
+        // Center DKI Jakarta Polygon directly in the middle of the 1:1 full-bleed canvas
+        function centerDKIPolygon() {
+            map.invalidateSize();
+            var dkiBounds = layer_LN_OUTER_KABKOT_JKTlines_2.getBounds();
+            if (dkiBounds && dkiBounds.isValid()) {
+                map.fitBounds(dkiBounds, { padding: [55, 55] });
+            } else {
+                map.fitBounds([[-6.365, 106.680], [-6.075, 106.975]], { padding: [55, 55] });
+            }
         }
+        centerDKIPolygon();
+        window.addEventListener('resize', centerDKIPolygon);
 
         // 3. Chronological 5-Level Gradation (Nov 2026: #ffffb2 -> Des 2027: #bd0026)
         var gradationPalette = [
@@ -416,7 +404,7 @@
             var fillHex = getFeatureChronologicalColor(feature);
             return {
                 pane: 'pane_211126_event_3',
-                radius: 6.5,
+                radius: 6.0,
                 stroke: false,
                 weight: 0,
                 fill: true,
