@@ -21,6 +21,24 @@
             font-family: 'Montserrat', sans-serif;
         }
 
+        /* Fullscreen Control Button Styling */
+        .leaflet-control-fullscreen a {
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            line-height: 30px;
+            color: #333333;
+            font-size: 14px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .leaflet-control-fullscreen a:hover {
+            background-color: #f4f4f4;
+            color: #000000;
+        }
+
         /* Point Outer Glow (50% Orange-Red) & Drop Shadow */
         .leaflet-pane.leaflet-pane_211126_event_3-pane svg path,
         .event-point-glow {
@@ -171,8 +189,66 @@
         <script src="data/211126_event_3.js"></script>
         <script>
         var map = L.map('map', {
-            zoomControl: true, maxZoom: 28, minZoom: 1
+            zoomControl: false, maxZoom: 28, minZoom: 1
         }).fitBounds([[-6.355, 106.500], [-6.035, 107.055]]);
+
+        // Top-Right Zoom Control
+        L.control.zoom({
+            position: 'topright'
+        }).addTo(map);
+
+        // Top-Right Full Screen Control
+        var FullscreenControl = L.Control.extend({
+            options: {
+                position: 'topright'
+            },
+            onAdd: function (map) {
+                var container = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-fullscreen');
+                var button = L.DomUtil.create('a', '', container);
+                button.href = '#';
+                button.title = 'Layar Penuh';
+                button.setAttribute('role', 'button');
+                button.setAttribute('aria-label', 'Layar Penuh');
+                button.innerHTML = '<i class="fas fa-expand" id="fullscreenIcon"></i>';
+
+                L.DomEvent.disableClickPropagation(container);
+                L.DomEvent.on(button, 'click', function (e) {
+                    L.DomEvent.preventDefault(e);
+                    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                        var docEl = document.documentElement;
+                        if (docEl.requestFullscreen) {
+                            docEl.requestFullscreen();
+                        } else if (docEl.webkitRequestFullscreen) {
+                            docEl.webkitRequestFullscreen();
+                        }
+                    } else {
+                        if (document.exitFullscreen) {
+                            document.exitFullscreen();
+                        } else if (document.webkitExitFullscreen) {
+                            document.webkitExitFullscreen();
+                        }
+                    }
+                });
+
+                function updateFullscreenIcon() {
+                    var icon = document.getElementById('fullscreenIcon');
+                    var isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+                    if (icon) {
+                        icon.className = isFs ? 'fas fa-compress' : 'fas fa-expand';
+                        button.title = isFs ? 'Keluar Layar Penuh' : 'Layar Penuh';
+                    }
+                    setTimeout(function () {
+                        map.invalidateSize();
+                    }, 150);
+                }
+
+                document.addEventListener('fullscreenchange', updateFullscreenIcon);
+                document.addEventListener('webkitfullscreenchange', updateFullscreenIcon);
+
+                return container;
+            }
+        });
+        map.addControl(new FullscreenControl());
 
         var hash = new L.Hash(map);
         map.attributionControl.setPrefix('<a href="https://github.com/tomchadwin/qgis2web" target="_blank">qgis2web</a> &middot; <a href="https://leafletjs.com" title="A JS library for interactive maps">Leaflet</a> &middot; <a href="https://qgis.org">QGIS</a>');
